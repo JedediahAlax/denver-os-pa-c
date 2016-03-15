@@ -446,44 +446,16 @@ static alloc_status _mem_resize_pool_store() {
 }
 
 static alloc_status _mem_resize_node_heap(pool_mgr_pt pool_mgr) {
-    if (((float) pool_mgr->used_nodes / pool_mgr->total_nodes) > MEM_NODE_HEAP_FILL_FACTOR) {
-        pool_mgr->total_nodes *= MEM_NODE_HEAP_EXPAND_FACTOR;
-        realloc(pool_mgr->node_heap, pool_mgr->total_nodes);
-        if (pool_mgr->node_heap != NULL) {
-            return ALLOC_OK;
-        }
-        else
-            return ALLOC_FAIL;
-    }
-    return ALLOC_OK;
+
 }
 
 static alloc_status _mem_resize_gap_ix(pool_mgr_pt pool_mgr) {
-    if (((float) pool_mgr->pool.num_gaps / pool_mgr->gap_ix_capacity) > MEM_GAP_IX_FILL_FACTOR) {
-        pool_mgr->gap_ix_capacity *= MEM_GAP_IX_EXPAND_FACTOR;
-        realloc(pool_mgr->gap_ix, pool_mgr->gap_ix_capacity);
-        if (pool_mgr->gap_ix != NULL) {
-            return ALLOC_OK;
-        }
-        else
-            return ALLOC_FAIL;
-    }
+
     return ALLOC_OK;
 }
 
 static alloc_status _mem_add_to_gap_ix(pool_mgr_pt pool_mgr, size_t size, node_pt node) {
-    _mem_resize_gap_ix(pool_mgr);
-    int i = 0;
-    while(pool_mgr->gap_ix[i].node != NULL){
-        ++i;
-    }
-    pool_mgr->gap_ix[i].node = node;
-    pool_mgr->gap_ix[i].size = size;
-    pool_mgr->pool.num_gaps++;
-    if(pool_mgr->gap_ix[i].node != NULL){
-        _mem_sort_gap_ix(pool_mgr);
-        return ALLOC_OK;
-    }
+
     return ALLOC_FAIL;
 }
 
@@ -502,19 +474,7 @@ static alloc_status _mem_remove_from_gap_ix(pool_mgr_pt pool_mgr, size_t size, n
 
 
 static alloc_status _mem_sort_gap_ix(pool_mgr_pt pool_mgr) {
-    for(int i = 0; i < pool_mgr->pool.num_gaps; ++i){
-        int swapped = 0;
-        for(int j = 0; i < pool_mgr->pool.num_gaps; ++i){
-            if(pool_mgr->gap_ix[i].size < pool_mgr->gap_ix[i+1].size){
-                gap_t swap = pool_mgr->gap_ix[i];
-                pool_mgr->gap_ix[i] = pool_mgr->gap_ix[i+1];
-                pool_mgr->gap_ix[i+1] = swap;
-                swapped = 1;
 
-            }
-        }
-        if(swapped == 0) break;
-    }
 
     return ALLOC_OK;
 }
