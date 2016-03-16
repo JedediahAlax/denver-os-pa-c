@@ -183,7 +183,7 @@ pool_pt mem_pool_open(size_t size, alloc_policy policy) {
         return NULL;
     }
 
-    // assign all the pointers and update meta data:
+    // assign all the pointers and update meta data
 
     //   initialize top node of node heap
     mgr->node_heap[0].next = NULL;
