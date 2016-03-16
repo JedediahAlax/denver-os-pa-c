@@ -335,6 +335,10 @@ alloc_pt mem_new_alloc(pool_pt pool, size_t size) {
     }
 
     // remove node from gap index
+    if(_mem_remove_from_gap_ix(manager,size,new_node) != ALLOC_OK){
+        return NULL;
+    }
+
 
     // convert gap_node to an allocation node of given size
     // adjust node heap:
