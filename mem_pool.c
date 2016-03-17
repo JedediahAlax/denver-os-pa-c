@@ -339,9 +339,17 @@ alloc_pt mem_new_alloc(pool_pt pool, size_t size) {
         return NULL;
     }
 
-
     // convert gap_node to an allocation node of given size
+    new_node -> allocated = 1;
+    new_node -> used = 1;
+    new_node -> alloc_record.size = size;
+
+
     // adjust node heap:
+    if (size_of_gap > 0) {
+
+    }
+
     //   if remaining gap, need a new node
     //   find an unused one in the node heap
     //   make sure one was found
