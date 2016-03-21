@@ -333,6 +333,7 @@ alloc_pt mem_new_alloc(pool_pt pool, size_t size) {
     manager -> pool.alloc_size += size;
 
     // calculate the size of the remaining gap, if any
+    // calculating the size left of one node
     int size_of_gap = 0;
     if(new_node -> alloc_record.size - size > 0) {
         size_of_gap = new_node -> alloc_record.size - size;
@@ -408,79 +409,120 @@ alloc_status mem_del_alloc(pool_pt pool, alloc_pt alloc) {
     // find the node in the node heap
     for(int i = 0; i < manager -> total_nodes; ++i) {
         if (node == &manager -> node_heap[i]) {
+            // this is node-to-delete
             delete_node = &manager -> node_heap[i];
             break;
         }
     }
 
-    // this is node-to-delete
+   /* for(int i=0;i < pool_mgr->total_nodes; i++){
+        if(pool_mgr->node_heap[i].alloc_record.mem == node->alloc_record.mem){
+            // this is node-to-delete
+            node_to_delete = &pool_mgr->node_heap[i];
+            break;
+        };
+    }; */
+
     // make sure it's found
-    // convert to gap node
-    // update metadata (num_allocs, alloc_size)
-    // if the next node in the list is also a gap, merge into node-to-delete
-    //   remove the next node from gap index
-    //   check success
-    //   add the size to the node-to-delete
-    //   update node as unused
-    //   update metadata (used nodes)
-    //   update linked list:
-    /*
-                    if (next->next) {
-                        next->next->prev = node_to_del;
-                        node_to_del->next = next->next;
-                    } else {
-                        node_to_del->next = NULL;
-                    }
-                    next->next = NULL;
-                    next->prev = NULL;
-     */
-
-    // this merged node-to-delete might need to be added to the gap index
-    // but one more thing to check...
-    // if the previous node in the list is also a gap, merge into previous!
-    //   remove the previous node from gap index
-    //   check success
-    //   add the size of node-to-delete to the previous
-    //   update node-to-delete as unused
-    //   update metadata (used_nodes)
-    //   update linked list
-    /*
-                    if (node_to_del->next) {
-                        prev->next = node_to_del->next;
-                        node_to_del->next->prev = prev;
-                    } else {
-                        prev->next = NULL;
-                    }
-                    node_to_del->next = NULL;
-                    node_to_del->prev = NULL;
-     */
-    //   change the node to add to the previous node!
-    // add the resulting node to the gap index
-    // check success
-
-
-
-
-
-
-
-
-
     if(delete_node == NULL) {
-        return ALLOC_FAIL;
+        return ALLOC_NOT_FREED;
     }
 
+    // convert to gap node
     delete_node -> allocated = 0;
 
+    // update metadata (num_allocs, alloc_size)
     manager -> pool.num_allocs--;
     manager -> pool.alloc_size -= delete_node -> alloc_record.size;
 
-    
+
+    // if the next node in the list is also a gap, merge into node-to-delete
+    node_pt node_to_merge = NULL;
+    if (delete_node -> next != NULL && delete_node -> next -> used == 1 && delete_node -> next -> allocated == 0 ) {
+
+        node_to_merge = delete_node->next;
+
+        //   remove the next node from gap index
+        _mem_remove_from_gap_ix(manager, node_to_merge->alloc_record.size, node_to_merge);
+
+        //   check success
+
+        //   add the size to the node-to-delete
+        delete_node->alloc_record.size = delete_node->alloc_record.size + delete_node->next->alloc_record.size;
+
+        //   update node as unused
+        node_to_merge->used = 0;
+
+        //   update metadata (used nodes)
+        manager->used_nodes--;
+
+        //   update linked list:
+
+        if (node_to_merge->next) {
+            node_to_merge->next->prev = delete_node;
+            delete_node->next = node_to_merge->next;
+        } else {
+            delete_node->next = NULL;
+        }
+        node_to_merge->next = NULL;
+        node_to_merge->prev = NULL;
+        node_to_merge->alloc_record.mem = NULL;
+        node_to_merge->alloc_record.size = 0;
+    };
+
+    // this merged node-to-delete might need to be added to the gap index
+    _mem_add_to_gap_ix(manager, delete_node ->alloc_record.size, delete_node);
+
+    // but one more thing to check...
+    // if the previous node in the list is also a gap, merge into previous!
+    node_pt previous_node;
+
+    if(delete_node -> prev != NULL && delete_node -> prev -> allocated == 0 && delete_node -> prev -> used == 1) {
+        previous_node = delete_node->prev;
+
+        //   remove the previous node from gap index
+        _mem_remove_from_gap_ix(manager, previous_node->alloc_record.size, previous_node);
+        _mem_remove_from_gap_ix(manager, delete_node->alloc_record.size, delete_node);
+
+        //   check success
+        //   add the size of node-to-delete to the previous
+        previous_node->alloc_record.size = delete_node->alloc_record.size + delete_node->prev->alloc_record.size;
+
+        // set the char * mem to NULL and updated the allocated record size
+        delete_node->alloc_record.mem = NULL;
+        delete_node->alloc_record.size = 0;
+
+        //   update node-to-delete as unused
+        delete_node->used = 0;
+        delete_node->allocated = 0;
+
+        //   update metadata (used_nodes)
+        manager->used_nodes--;
+
+        //   update linked list
+
+        if (delete_node->next) {
+            previous_node->next = delete_node->next;
+            delete_node->next->prev = previous_node;
+        } else {
+            previous_node->next = NULL;
+        }
+        delete_node->next = NULL;
+        delete_node->prev = NULL;
+
+        //   change the node to add to the previous node!
+        // add the resulting node to the gap index
+
+        _mem_add_to_gap_ix(manager, previous_node->alloc_record.size, previous_node);
+        // check success
+    };
 
     return ALLOC_OK;
 }
 
-void mem_inspect_pool(pool_pt pool, pool_segment_pt *segments, unsigned *num_segments) {
+void mem_inspect_pool(pool_pt pool,
+                      pool_segment_pt *segments,
+                      unsigned *num_segments) {
     // get the mgr from the pool
     // allocate the segments array with size == used_nodes
     // check successful
@@ -500,55 +542,85 @@ void mem_inspect_pool(pool_pt pool, pool_segment_pt *segments, unsigned *num_seg
 /* Definitions of static functions */
 /*                                 */
 /***********************************/
-
-}
-
-/* Definitions of static functions */
 static alloc_status _mem_resize_pool_store() {
-
-    if (((float) pool_store_size / pool_store_capacity) > MEM_POOL_STORE_FILL_FACTOR) {
-        /* Reallocating size for array */
-        pool_store = realloc(pool_store, MEM_EXPAND_FACTOR * sizeof(pool_store));
-        /* changing the max capacity variable */
-        pool_store_capacity *= MEM_EXPAND_FACTOR;
-        if (pool_store != NULL)
-            return ALLOC_OK;
-        else
-            return ALLOC_FAIL;
-    }
-    return ALLOC_OK;
-}
-
-static alloc_status _mem_resize_node_heap(pool_mgr_pt pool_mgr) {
-
-}
-
-static alloc_status _mem_resize_gap_ix(pool_mgr_pt pool_mgr) {
-
-    return ALLOC_OK;
-}
-
-static alloc_status _mem_add_to_gap_ix(pool_mgr_pt pool_mgr, size_t size, node_pt node) {
+    // check if necessary
+    /*
+                if (((float) pool_store_size / pool_store_capacity)
+                    > MEM_POOL_STORE_FILL_FACTOR) {...}
+     */
+    // don't forget to update capacity variables
 
     return ALLOC_FAIL;
 }
 
-static alloc_status _mem_remove_from_gap_ix(pool_mgr_pt pool_mgr, size_t size, node_pt node) {
-    int i = 0;
-    while(pool_mgr->gap_ix[i].node != node){
-        ++i;
-    }
-    pool_mgr->gap_ix[i].size = 0;
-    pool_mgr->gap_ix[i].node = NULL;
-    pool_mgr->pool.num_gaps--;
-    //pool_mgr->used_nodes--;
+static alloc_status _mem_resize_node_heap(pool_mgr_pt pool_mgr) {
+    // see above
 
+    return ALLOC_FAIL;
+}
+
+static alloc_status _mem_resize_gap_ix(pool_mgr_pt pool_mgr) {
+
+    float expandFactor = (float)MEM_GAP_IX_EXPAND_FACTOR * (float)pool_mgr->gap_ix_capacity;
+    //Does gap_ix need to be resized?
+    if((((float)pool_mgr->pool.num_gaps)/(pool_mgr->gap_ix_capacity)) > MEM_GAP_IX_FILL_FACTOR){
+        //resize if needed
+        //Perform realloc to increase size of gap_ix
+        pool_mgr->gap_ix = realloc(pool_mgr->gap_ix, expandFactor * sizeof(gap_t));
+        //update metadata
+        //  Expand the gap_ix_capacity by the same factor as the realloc
+        pool_mgr->gap_ix_capacity *= MEM_GAP_IX_EXPAND_FACTOR;
+        //Check and make sure it worked
+        if(NULL == pool_mgr->gap_ix){
+
+            return ALLOC_FAIL;
+        }
+        return ALLOC_OK;
+    }
     return ALLOC_OK;
 }
 
+static alloc_status _mem_add_to_gap_ix(pool_mgr_pt pool_mgr,
+                                       size_t size,
+                                       node_pt node) {
 
+    // expand the gap index, if necessary (call the function)
+    _mem_resize_gap_ix(pool_mgr);
+    // add the entry at the end
+    pool_mgr->gap_ix[pool_mgr->pool.num_gaps].node = node;
+    pool_mgr->gap_ix[pool_mgr->pool.num_gaps].size = size;
+    // update metadata (num_gaps)
+    pool_mgr->pool.num_gaps ++;
+    // sort the gap index (call the function)
+    alloc_status sortCheck = _mem_sort_gap_ix(pool_mgr);
+    // check success
+    if(sortCheck == ALLOC_OK){
+        return ALLOC_OK;
+    }
+    return ALLOC_FAIL;
+}
+
+static alloc_status _mem_remove_from_gap_ix(pool_mgr_pt pool_mgr,
+                                            size_t size,
+                                            node_pt node) {
+    // find the position of the node in the gap index
+    // loop from there to the end of the array:
+    //    pull the entries (i.e. copy over) one position up
+    //    this effectively deletes the chosen node
+    // update metadata (num_gaps)
+    // zero out the element at position num_gaps!
+
+    return ALLOC_FAIL;
+}
+
+// note: only called by _mem_add_to_gap_ix, which appends a single entry
 static alloc_status _mem_sort_gap_ix(pool_mgr_pt pool_mgr) {
+    // the new entry is at the end, so "bubble it up"
+    // loop from num_gaps - 1 until but not including 0:
+    //    if the size of the current entry is less than the previous (u - 1)
+    //    or if the sizes are the same but the current entry points to a
+    //    node with a lower address of pool allocation address (mem)
+    //       swap them (by copying) (remember to use a temporary variable)
 
-
-    return ALLOC_OK;
+    return ALLOC_FAIL;
 }
