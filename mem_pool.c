@@ -679,37 +679,19 @@ static alloc_status _mem_remove_from_gap_ix(pool_mgr_pt pool_mgr,
 
 // note: only called by _mem_add_to_gap_ix, which appends a single entry
 static alloc_status _mem_sort_gap_ix(pool_mgr_pt pool_mgr) {
-    debug("FUNCTION CALL: _mem_sort_gap_ix() has been called\n");
+    for(int i = 0; i < pool_mgr->pool.num_gaps; ++i){
+        int swapped = 0;
+        for(int j = 0; i < pool_mgr->pool.num_gaps; ++i){
+            if(pool_mgr->gap_ix[i].size < pool_mgr->gap_ix[i+1].size){
+                gap_t swap = pool_mgr->gap_ix[i];
+                pool_mgr->gap_ix[i] = pool_mgr->gap_ix[i+1];
+                pool_mgr->gap_ix[i+1] = swap;
+                swapped = 1;
 
-    //If the number of gaps is either 0 or 1, there is no reason to sort the list
-    if (pool_mgr->pool.num_gaps == 1 || pool_mgr->pool.num_gaps == 0){
-        return ALLOC_OK;
-    }
-
-    // the new entry is at the end, so "bubble it up"
-    // loop from num_gaps - 1 until but not including 0:
-    for (int i = pool_mgr->pool.num_gaps - 1; i > 0; i--) {
-        //    if the size of the current entry is less than the previous (i - 1)
-        if(pool_mgr->gap_ix[i].size <= pool_mgr->gap_ix[i-1].size){
-            //    or if the sizes are the same but the current entry points to a
-            //    node with a lower address of pool allocation address (mem)
-            //Check if it is the same size as the previous....
-            if(pool_mgr->gap_ix[i-1].size == pool_mgr->gap_ix[i].size){
-                //if it is the exact same size, NOW we need to sort by mem address
-                if(pool_mgr->gap_ix[i].node > pool_mgr->gap_ix[i-1].node){
-                    break;
-                }
             }
-            //swap them (by copying) (remember to use a temporary variable)
-            node_pt node_pt_temp = pool_mgr->gap_ix[i-1].node;
-            size_t size_t_temp = pool_mgr->gap_ix[i-1].size;
-            //move the gap_t "up"
-            pool_mgr->gap_ix[i-1] = pool_mgr->gap_ix[i];
-            //Assign the temp node to the spot in the gap_ix
-            pool_mgr->gap_ix[i].node = node_pt_temp;
-            pool_mgr->gap_ix[i].size = size_t_temp;
-
         }
+        if(swapped == 0) break;
     }
+
     return ALLOC_OK;
 }
