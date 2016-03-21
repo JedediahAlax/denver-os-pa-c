@@ -398,8 +398,21 @@ alloc_pt mem_new_alloc(pool_pt pool, size_t size) {
 
 alloc_status mem_del_alloc(pool_pt pool, alloc_pt alloc) {
     // get mgr from pool by casting the pointer to (pool_mgr_pt)
+    pool_mgr_pt manager = (pool_mgr_pt) pool;
+
+     node_pt delete_node;
+
     // get node from alloc by casting the pointer to (node_pt)
+    node_pt node = (node_pt) alloc;
+
     // find the node in the node heap
+    for(int i = 0; i < manager -> total_nodes; ++i) {
+        if (node == &manager -> node_heap[i]) {
+            delete_node = &manager -> node_heap[i];
+            break;
+        }
+    }
+
     // this is node-to-delete
     // make sure it's found
     // convert to gap node
@@ -445,18 +458,13 @@ alloc_status mem_del_alloc(pool_pt pool, alloc_pt alloc) {
     // add the resulting node to the gap index
     // check success
 
-    pool_mgr_pt manager = (pool_mgr_pt) pool;
 
-    node_pt node = (node_pt) alloc;
 
-    node_pt delete_node = NULL;
 
-    for(int i = 0; i < manager -> total_nodes; ++i) {
-        if (node == &manager -> node_heap[i]) {
-            delete_node = &manager -> node_heap[i];
-            break;
-        }
-    }
+
+
+
+
 
     if(delete_node == NULL) {
         return ALLOC_FAIL;
