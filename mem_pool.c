@@ -90,11 +90,12 @@ alloc_status mem_free() {
     }
 
     // make sure all pool managers have been deallocated
-    for(int i = 0; i < pool_store_size; ++i){
+    for(int i = 0; i < pool_store_size; i++){
         if(pool_store[i] != NULL) {
-            if(mem_pool_close(&pool_store[i]->pool) != ALLOC_OK) {
+            /*if(mem_pool_close(&pool_store[i]->pool) != ALLOC_OK) {
                 return ALLOC_FAIL;
-            }
+            } */
+            mem_pool_close((pool_pt) pool_store[i]);
         }
 
     }
@@ -107,33 +108,10 @@ alloc_status mem_free() {
     pool_store_capacity = 0;
     pool_store = NULL;
 
-    // one last NULL check
-    if(pool_store == NULL)
-        // Success!
-        return ALLOC_OK;
-    else
-        // Mem free failed
-        return ALLOC_FAIL;
+    return ALLOC_OK;
 }
 
 pool_pt mem_pool_open(size_t size, alloc_policy policy) {
-    // make sure there the pool store is allocated
-    // expand the pool store, if necessary
-    // allocate a new mem pool mgr
-    // check success, on error return null
-    // allocate a new memory pool
-    // check success, on error deallocate mgr and return null
-    // allocate a new node heap
-    // check success, on error deallocate mgr/pool and return null
-    // allocate a new gap index
-    // check success, on error deallocate mgr/pool/heap and return null
-    // assign all the pointers and update meta data:
-    //   initialize top node of node heap
-    //   initialize top node of gap index
-    //   initialize pool mgr
-    //   link pool mgr to pool store
-    // return the address of the mgr, cast to (pool_pt)
-    //
 
     // make sure there the pool store is allocated
     assert(pool_store);
@@ -300,9 +278,9 @@ alloc_pt mem_new_alloc(pool_pt pool, size_t size) {
     // if FIRST_FIT, then find the first sufficient node in the node heap
     if(manager -> pool.policy == FIRST_FIT) {
         node_pt this_node = manager -> node_heap;
-       while ((manager -> node_heap[i].allocated != 0) || (manager -> node_heap[i].alloc_record.size < size) && i < manager -> total_nodes) {
-           ++i;
-       }
+        while ((manager -> node_heap[i].allocated != 0) || (manager -> node_heap[i].alloc_record.size < size) && i < manager -> total_nodes) {
+            ++i;
+        }
 
         if ( i == manager -> total_nodes) {
             return NULL;
@@ -311,7 +289,7 @@ alloc_pt mem_new_alloc(pool_pt pool, size_t size) {
         new_node = &manager -> node_heap[i];
     }
 
-    // if BEST_FIT, then find the first sufficient node in the gap index
+        // if BEST_FIT, then find the first sufficient node in the gap index
     else if (manager -> pool.policy == BEST_FIT) {
         if (manager ->pool.num_gaps > 0) {
             while (i < manager -> pool.num_gaps && manager -> gap_ix[i+1].size >= size) {
@@ -401,7 +379,7 @@ alloc_status mem_del_alloc(pool_pt pool, alloc_pt alloc) {
     // get mgr from pool by casting the pointer to (pool_mgr_pt)
     pool_mgr_pt manager = (pool_mgr_pt) pool;
 
-     node_pt delete_node;
+    node_pt delete_node;
 
     // get node from alloc by casting the pointer to (node_pt)
     node_pt node = (node_pt) alloc;
@@ -515,17 +493,17 @@ alloc_status mem_del_alloc(pool_pt pool, alloc_pt alloc) {
 
 void mem_inspect_pool(pool_pt pool, pool_segment_pt *segments, unsigned *num_segments) {
     // get the mgr from the pool
-    pool_mgr_pt pool_mgr = (pool_mgr_pt) pool;
+    pool_mgr_pt pool_manager = (pool_mgr_pt) pool;
 
     // allocate the segments array with size == used_nodes
-    pool_segment_pt segs = (pool_segment_pt) calloc(pool_mgr->used_nodes, sizeof(pool_segment_t));
+    pool_segment_pt segs = (pool_segment_pt) calloc(pool_manager->used_nodes, sizeof(pool_segment_t));
 
     // check successful
     assert(segs);
-    node_pt current = pool_mgr->node_heap;
+    node_pt current = pool_manager->node_heap;
 
     // loop through the node heap and the segments array
-    for(int i = 0; i < pool_mgr->used_nodes; ++i){
+    for(int i = 0; i < pool_manager->used_nodes; i++){
         //    for each node, write the size and allocated in the segment
         segs[i].size = current->alloc_record.size;
         segs[i].allocated = current->allocated;
@@ -536,7 +514,8 @@ void mem_inspect_pool(pool_pt pool, pool_segment_pt *segments, unsigned *num_seg
 
     // "return" the values:
     *segments = segs;
-    *num_segments = pool_mgr->used_nodes;
+    *num_segments = pool_manager->used_nodes;
+    return;
 }
 
 
@@ -654,7 +633,7 @@ static alloc_status _mem_remove_from_gap_ix(pool_mgr_pt pool_mgr,
         }
     }
     if(flag == 0){
-       // debug("FAIL: flag == 0 in _mem_remove_from_gap_ix");
+        // debug("FAIL: flag == 0 in _mem_remove_from_gap_ix");
         return ALLOC_FAIL;
     }
     // loop from there to the end of the array:
