@@ -1,11 +1,10 @@
 /*
 * Written by group:
-*   Ross Baldwin
 *   Jedediah
+*   Ross Baldwin
 *   Christopher
 *   M. Ryan Wingard
 */
-
 
 #include <stdlib.h>
 #include <assert.h>
