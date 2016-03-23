@@ -1,3 +1,13 @@
+/*
+* Written by group:
+*   Ross Baldwin
+*   Jedediah
+*   Christopher
+*   M. Ryan Wingard
+*/
+
+
+
 #include <stdlib.h>
 #include <assert.h>
 #include <stdio.h> // for perror()
@@ -114,7 +124,11 @@ alloc_status mem_free() {
 pool_pt mem_pool_open(size_t size, alloc_policy policy) {
 
     // make sure there the pool store is allocated
-    assert(pool_store);
+    //assert(pool_store);
+    if (pool_store == NULL) {
+        return NULL;
+
+    }
 
     // expand the pool store, if necessary
     if (((float) pool_store_size / pool_store_capacity) > MEM_POOL_STORE_FILL_FACTOR) {
@@ -171,7 +185,7 @@ pool_pt mem_pool_open(size_t size, alloc_policy policy) {
     mgr->node_heap[0].next = NULL;
     mgr->node_heap[0].prev = NULL;
     mgr->node_heap[0].allocated = 0;
-    mgr->node_heap[0].used = 0;
+    mgr->node_heap[0].used = 1;
     mgr->node_heap[0].alloc_record.mem = mgr->pool.mem;
     mgr->node_heap[0].alloc_record.size = size;
 
@@ -207,14 +221,17 @@ alloc_status mem_pool_close(pool_pt pool) {
     // note: don't decrement pool_store_size, because it only grows
 
     // get mgr from pool by casting the pointer to (pool_mgr_pt)
-    pool_mgr_pt manager = (pool_mgr_pt)pool;
+    pool_mgr_pt manager = (pool_mgr_pt) pool;
 
     // check if this pool is allocated
     if(manager == NULL)
         return ALLOC_NOT_FREED;
 
     // check if it has only one gap
-    if(manager->pool.num_gaps != 1) {
+   // if(manager->pool.num_gaps != 1) {
+       // return ALLOC_NOT_FREED;
+   // }
+    if(manager->used_nodes > 1){
         return ALLOC_NOT_FREED;
     }
 
@@ -530,23 +547,23 @@ static alloc_status _mem_resize_pool_store() {
     //  "necessary" to resize when size/cap > 0.75
     if (((float)pool_store_size / (float)pool_store_capacity) > MEM_POOL_STORE_FILL_FACTOR){
 
-
-        pool_store = (pool_mgr_pt *)realloc(pool_store, (sizeof(pool_mgr_t)*pool_store_capacity + 1));
+        unsigned int expandFactor = pool_store_capacity * MEM_POOL_STORE_EXPAND_FACTOR;
+        pool_store = (pool_mgr_pt *)realloc(pool_store, (sizeof(pool_mgr_pt) * expandFactor));
         //Verify the realloc worked
         if(pool_store == NULL){
-
             return ALLOC_FAIL;
         }
         //double check that pool_store isnt NULL after realloc
         assert(pool_store);
         //Update capacity variable
-        pool_store_capacity++;
+        pool_store_capacity = expandFactor;
 
         return ALLOC_OK;
     }
 
     return ALLOC_OK;
 }
+
 
 
 
@@ -658,19 +675,28 @@ static alloc_status _mem_remove_from_gap_ix(pool_mgr_pt pool_mgr,
 
 // note: only called by _mem_add_to_gap_ix, which appends a single entry
 static alloc_status _mem_sort_gap_ix(pool_mgr_pt pool_mgr) {
-    for(int i = 0; i < pool_mgr->pool.num_gaps; ++i){
-        int swapped = 0;
-        for(int j = 0; i < pool_mgr->pool.num_gaps; ++i){
-            if(pool_mgr->gap_ix[i].size < pool_mgr->gap_ix[i+1].size){
-                gap_t swap = pool_mgr->gap_ix[i];
-                pool_mgr->gap_ix[i] = pool_mgr->gap_ix[i+1];
-                pool_mgr->gap_ix[i+1] = swap;
-                swapped = 1;
-
-            }
-        }
-        if(swapped == 0) break;
+    //Check and see if gap_ix has 0 or 1 member, if so sorting is not required....
+    if(pool_mgr->pool.num_gaps <= 1){
+        return ALLOC_OK;
     }
 
+    // the new entry is at the end, so "bubble it up"
+    // loop from num_gaps - 1 until but not including 0:
+    int counter = pool_mgr->pool.num_gaps -1;
+    for(counter ; counter > 0 ; counter--){
+        //    if the size of the current entry is less than the previous (u - 1)
+        //    or if the sizes are the same but the current entry points to a
+        //    node with a lower address of pool allocation address (mem)
+        //       swap them (by copying) (remember to use a temporary variable)
+        gap_t gap1 = pool_mgr->gap_ix[counter];
+        gap_t gap2 = pool_mgr->gap_ix[counter-1];
+        if(gap1.size < gap2.size
+           || (gap1.size == gap2.size
+               && gap1.node->alloc_record.mem < gap2.node->alloc_record.mem)){
+            gap_t temp_gap_t = gap1;
+            gap1 = gap2;
+            gap2 = temp_gap_t;
+        }
+    }
     return ALLOC_OK;
 }
